@@ -1,0 +1,10 @@
+{
+  "client": {
+    "endpoint": "",
+    "accessKeyId": "",
+    "accessKeySecret": ""
+  },
+  "defaultBucket": {
+    "name": ""
+  }
+}
