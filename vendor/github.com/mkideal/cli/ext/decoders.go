@@ -3,13 +3,13 @@ package ext
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/jinzhu/now"
+	"unsafe"
 )
 
 // Time wrap time.Time
@@ -34,28 +34,44 @@ var timeFormats = []string{
 	time.StampMilli,
 	time.StampMicro,
 	time.StampNano,
+	"2006-01-02",
+	"2006/01/02",
+	"2006:01:02",
+	"15:04:05",
+	"2006-01-02 15:04:05",
+	"2006/01/02 15:04:05",
+	"2006:01:02 15:04:05",
+	"15:04:05 2006-01-02",
+	"15:04:05 2006/01/02",
+	"15:04:05 2006:01:02",
 }
 
 func (t *Time) Decode(s string) error {
+	now := time.Now()
 	if s == "" {
-		t.Time = time.Now()
+		t.Time = now
 		return nil
 	}
 	for _, format := range timeFormats {
 		v, err := time.Parse(format, s)
 		if err == nil {
+			newYear, newMonth, newDay := v.Year(), v.Month(), v.Day()
+			reset := false
+			if newYear == 0 {
+				reset = true
+				newYear = now.Year()
+				newMonth = now.Month()
+				newDay = now.Day()
+			}
+			if reset {
+				v = time.Date(newYear, newMonth, newDay, v.Hour(), v.Minute(), v.Second(), v.Nanosecond(), v.Location())
+			}
 			t.Time = v
 			t.isSet = true
 			return nil
 		}
 	}
-	v, err := now.Parse(s)
-	if err != nil {
-		return err
-	}
-	t.Time = v
-	t.isSet = true
-	return nil
+	return fmt.Errorf("unsupported time format")
 }
 
 func (t Time) Encode() string {
@@ -72,6 +88,10 @@ type Duration struct {
 }
 
 func (d *Duration) Decode(s string) error {
+	if i, err := strconv.ParseUint(s, 10, 64); err == nil {
+		d.Duration = time.Duration(i) * time.Second
+		return nil
+	}
 	v, err := time.ParseDuration(s)
 	if err != nil {
 		return err
@@ -123,6 +143,145 @@ func (f File) Encode() string {
 	return f.filename
 }
 
+// Reader
+type Reader struct {
+	reader   io.Reader
+	filename string
+}
+
+func (r *Reader) Decode(s string) error {
+	if s == "" {
+		r.reader = os.Stdin
+		r.filename = os.Stdin.Name()
+	} else {
+		r.filename = s
+		file, err := os.Open(s)
+		if err != nil {
+			return err
+		}
+		r.reader = file
+	}
+	return nil
+}
+
+// SetReader replaces the native reader
+func (r *Reader) SetReader(reader io.Reader) {
+	r.Close()
+	r.reader = reader
+	if file, ok := reader.(*os.File); ok {
+		r.filename = file.Name()
+	} else {
+		r.filename = ""
+	}
+}
+
+// Read implementes io.Reader
+func (r Reader) Read(data []byte) (n int, err error) {
+	if r.reader == nil {
+		return os.Stdin.Read(data)
+	}
+	return r.reader.Read(data)
+}
+
+func (r Reader) Close() error {
+	if r.reader != nil && !r.IsStdin() {
+		if c, ok := r.reader.(io.Closer); ok {
+			return c.Close()
+		}
+	}
+	return nil
+}
+
+func (r Reader) Name() string {
+	if r.reader == nil {
+		return os.Stdin.Name()
+	}
+	return r.filename
+}
+
+func (r Reader) IsStdin() bool {
+	if r.reader == nil {
+		return true
+	}
+	if stdin, ok := r.reader.(*os.File); ok {
+		return uintptr(unsafe.Pointer(stdin)) == uintptr(unsafe.Pointer(os.Stdin))
+	}
+	return false
+}
+
+// Writer
+type Writer struct {
+	writer   io.Writer
+	filename string
+}
+
+func (w *Writer) Decode(s string) error {
+	if w.writer != nil {
+		return nil
+	}
+	if s == "" {
+		w.writer = os.Stdout
+		w.filename = os.Stdout.Name()
+		return nil
+	}
+	w.filename = s
+	return nil
+}
+
+// SetWriter replaces the native writer
+func (w *Writer) SetWriter(writer io.Writer) {
+	w.Close()
+	w.writer = writer
+	if file, ok := w.writer.(*os.File); ok {
+		w.filename = file.Name()
+	} else {
+		w.filename = ""
+	}
+}
+
+// Write implementes io.Writer interface
+func (w *Writer) Write(data []byte) (n int, err error) {
+	if w.writer == nil {
+		if w.filename == "" {
+			w.writer = os.Stdout
+			w.filename = os.Stdout.Name()
+		} else {
+			file, err := os.Create(w.filename)
+			if err != nil {
+				return 0, err
+			}
+			w.writer = file
+		}
+	}
+	return w.writer.Write(data)
+}
+
+func (w *Writer) Close() error {
+	if w.writer != nil && !w.IsStdout() {
+		if c, ok := w.writer.(io.Closer); ok {
+			return c.Close()
+		}
+	}
+	return nil
+}
+
+func (w *Writer) Name() string {
+	if w.writer == nil {
+		return os.Stdout.Name()
+	}
+	return w.filename
+}
+
+func (w Writer) IsStdout() bool {
+	if w.writer == nil {
+		return true
+	}
+	if stdout, ok := w.writer.(*os.File); ok {
+		return uintptr(unsafe.Pointer(stdout)) == uintptr(unsafe.Pointer(os.Stdout))
+	}
+	return false
+}
+
 // CSV reads one csv record
 type CSVRecord struct {
 	raw []string
@@ -153,7 +312,7 @@ func (d CSVRecord) Bools() ([]bool, error) {
 		} else {
 			v, err := strconv.Atoi(s)
 			if err != nil {
-				return nil, fmt.Errorf("parse %s to bollean fail", s)
+				return nil, fmt.Errorf("parse %s to boolean fail", s)
 			}
 			ret = append(ret, v != 0)
 		}

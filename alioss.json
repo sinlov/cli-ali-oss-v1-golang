@@ -1,8 +1,8 @@
 {
   "client": {
-    "endpoint": "",
-    "accessKeyId": "",
-    "accessKeySecret": ""
+    "endpoint": "https://gdp.shishike.com/api/v1/osstoken/",
+    "accessKeyId": "7ad919f8913b0ac7015ddf6aedd7895c65478a19",
+    "accessKeySecret": "4aa5aea7d0906060e77451f628b533a5fa318d89"
   },
   "defaultBucket": {
     "name": ""
