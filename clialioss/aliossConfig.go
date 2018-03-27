@@ -8,6 +8,7 @@ import (
 	sFiles "github.com/sinlov/golang_utils/files"
 	"fmt"
 	"errors"
+	"io/ioutil"
 )
 
 const (
@@ -52,4 +53,25 @@ func AliOssConfigPath(custom string) (string, string, error) {
 		configFilePath = ""
 		return configFilePath, currentPath, errors.New(errInfo)
 	}
+}
+
+func ReadConfigFileContent(filePath string) ([]byte, error) {
+	_, err := os.Stat(filePath)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil, err
+		} else {
+			return nil, err
+		}
+	}
+
+	fileJson, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := ioutil.ReadAll(fileJson)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
 }

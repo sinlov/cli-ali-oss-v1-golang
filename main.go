@@ -5,12 +5,16 @@ import (
 	"os"
 	clix "github.com/mkideal/cli/ext"
 	sCli "github.com/sinlov/golang_utils/cli"
+	"github.com/sinlov/cli-ali-oss-v1-golang/clialioss"
+	json "github.com/json-iterator/go"
 )
 
 const (
 	versionName string = "1.0.0"
-	commInfo string = "ali oss cli utils"
+	commInfo    string = "ali oss cli utils"
 )
+
+var ShowVerbose bool = false
 
 type config struct {
 	A string
@@ -45,12 +49,13 @@ type filterCLI struct {
 type aliOssCli struct {
 	cli.Helper
 	Version    bool      `cli:"version" usage:"version"`
+	Verbose    bool      `cli:"v" usage:"see verbose"`
 	ConfigFile clix.File `cli:"config" usage:"read config from file at same path of briny, this file must be json"`
 	Bucket     string    `cli:"b,bucket" usage:"bucket name set, if not set will use config json {defaultBucket.name}" dft:"bucket"`
-	Search     string    `cli:"s,search" usage:"search file at bucket" dft:"object"`
-	Upload     string    `cli:"u,upload" usage:"upload LocalFile to bucket object" dft:"object"`
-	Download   string    `cli:"d,download" usage:"download File in bucket object" dft:"object"`
-	Remove     string    `cli:"r,remove" usage:"Delete File in bucket object" dft:"object"`
+	Search     string    `cli:"s,search" usage:"search file at bucket" dft:""`
+	Upload     string    `cli:"u,upload" usage:"upload LocalFile to bucket object" dft:""`
+	Download   string    `cli:"d,download" usage:"download File in bucket object" dft:""`
+	Remove     string    `cli:"r,remove" usage:"Delete File in bucket object" dft:""`
 }
 
 func main() {
@@ -61,9 +66,60 @@ func main() {
 	cli.Run(new(aliOssCli), func(ctx *cli.Context) error {
 		argv := ctx.Argv().(*aliOssCli)
 		if argv.Version {
-			ctx.String(commInfo + "\n\tversion: " + versionName)
+			ctx.String("%v\n\tversion: %v\n", commInfo, versionName)
 			os.Exit(0)
+		}
+		if argv.Verbose {
+			ShowVerbose = argv.Verbose
+		}
+
+		var configJson []byte
+		if argv.ConfigFile.String() != "" {
+			configJson = []byte(argv.ConfigFile.String())
+		} else {
+			configPath, _, err := clialioss.AliOssConfigPath("")
+			if err != nil {
+				return err
+			}
+			configContent, err := clialioss.ReadConfigFileContent(configPath)
+			if err != nil {
+				return err
+			}
+			configJson = configContent
+		}
+		if ShowVerbose {
+			sCli.FmtBlue("config json => %v\n", string(configJson[:]))
+		}
+		var aliOssConf clialioss.AliossConf
+		err := json.Unmarshal(configJson, &aliOssConf)
+		if err != nil {
+			return err
+		}
+		ctx.String("AccessKeyId => %v\n", aliOssConf.AccessKeyId)
+		ctx.String("DefaultBucket => %v\n", aliOssConf.DefaultBucket.Name)
+
+		var bucket = aliOssConf.DefaultBucket.Name
+		if argv.Bucket != "" {
+			bucket = argv.Bucket
+		}
+		if bucket == "" {
+			showErrorAndExit("bucket not set, exit!")
+		}
+		sCli.FmtGreen("-> Bucket %v", bucket)
+
+		if argv.Search != "" {
+
+		} else if argv.Upload != "" {
+
+		} else if argv.Download != "" {
+
+		} else if argv.Remove != "" {
+
 		}
 		return nil
 	})
+}
+func showErrorAndExit(str string, a ... interface{}) {
+	sCli.FmtRed(str, a)
+	os.Exit(1)
 }
