@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"os"
 	"strings"
+	"fmt"
 )
 
 func TestAliOssConfigPath(t *testing.T) {
@@ -47,3 +48,16 @@ func TestAliOssConfigPath(t *testing.T) {
 	})
 }
 
+func TestReadConfigFileContent(t *testing.T) {
+	convey.Convey("mock TestReadConfigFileContent", t, func() {
+		// mock
+
+		convey.Convey("do TestReadConfigFileContent", func() {
+			// do
+			convey.Convey("verify TestReadConfigFileContent", func() {
+				// verify
+				convey.So("", convey.ShouldEqual, "")
+			})
+		})
+	})
+}
