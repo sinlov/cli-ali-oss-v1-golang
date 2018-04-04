@@ -13,6 +13,7 @@ type SDKAliOss struct {
 	bucket *oss.Bucket
 }
 
+// see https://help.aliyun.com/document_detail/32145.html?spm=a2c4g.11186623.6.829.yBI6EJ
 func (sdk *SDKAliOss) InitClient(endpoint, accessKeyID, accessKeySecret, bucketName string) error {
 	client, err := oss.New(endpoint, accessKeyID, accessKeySecret)
 	if err != nil {
