@@ -72,7 +72,7 @@ do
       else
         mv "main" "${buildPath}/${RepoFileName}_${platform}_${bit}"
       fi
-      echo "build OSX 64 finish"
+        echo "build ${platform}-${bit} finish"
       done
     done
 
